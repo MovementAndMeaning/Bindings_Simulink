@@ -20,29 +20,8 @@
 #include <yarp/os/BufferedPort.h>
 
 
-//--class  counter {
-//--  double  x;
-//--public:
-//--  counter() {
-//--    x = 0.0;
-//--  }
-//--  double output(void) {
-//--    x = x + 1.0;
-//--    return x; 
-//--  }
-//--  double getX() const
-//--  {
-//--    return x;
-//--  }
-//--  void setX(double v)
-//--  {
-//--    x = v;
-//--  }
-//--};
-
 #define S_FUNCTION_LEVEL 2
 #define S_FUNCTION_NAME  yarpSendText_sfun
-
 
 /*
  * Need to include simstruc.h for the definition of the SimStruct and
@@ -78,8 +57,7 @@ std::string double_array_to_string(InputRealPtrsType double_array, int size_of_a
 /*
  * Check to make sure that each parameter is 1-d and positive
  */
-static void mdlCheckParameters(SimStruct *S)
-{
+static void mdlCheckParameters(SimStruct *S) {
 
   const mxArray *pVal0 = ssGetSFcnParam(S,0);
 
@@ -97,8 +75,7 @@ static void mdlCheckParameters(SimStruct *S)
  *    The sizes information is used by Simulink to determine the S-function
  *    block's characteristics (number of inputs, outputs, states, etc.).
  */
-static void mdlInitializeSizes(SimStruct *S)
-{
+static void mdlInitializeSizes(SimStruct *S) {
 
   ssSetNumSFcnParams(S, 2);  /* Number of expected parameters */
   
@@ -147,12 +124,16 @@ static void mdlInitializeSizes(SimStruct *S)
  *    S-function. You must register the same number of sample times as
  *    specified in ssSetNumSampleTimes.
  */
-static void mdlInitializeSampleTimes(SimStruct *S)
-{
-  ssSetSampleTime(S, 0, mxGetScalar(ssGetSFcnParam(S, 0)));
+static void mdlInitializeSampleTimes(SimStruct *S) {
+#define SAMPLE_TIME_0        1  
+  ssSetSampleTime(S, 0, SAMPLE_TIME_0);
+  
+  //  ssSetSampleTime(S, 0, mxGetScalar(ssGetSFcnParam(S, 0)));
   ssSetOffsetTime(S, 0, 0.0);
   ssSetModelReferenceSampleTimeDefaultInheritance(S);
 }
+
+
 
 /* Function: mdlStart =======================================================
  * Abstract:
@@ -172,27 +153,26 @@ static void mdlStart(SimStruct *S) {
   
   char_T buf01[LENGTH];
   mxGetString(ssGetSFcnParam(S, 0), buf01, LENGTH);
-  mexPrintf("Port1: #%s#\n", buf01);
+
 
   char_T buf02[LENGTH];
   mxGetString(ssGetSFcnParam(S, 1), buf02, LENGTH);
 
-  
+ 
+  std::string strPortNameSender(buf01);
+  std::string strPortNameReceiver(buf02);
 
-  std::string strPortNameWrite(buf01);
-  std::string strPortNameRead(buf02);
-  
-  yPortOut->open(strPortNameWrite.c_str()); 
+  mexPrintf("writing to port: %s\n", strPortNameSender.c_str());
+  yPortOut->open(strPortNameSender.c_str()); 
 
-  Sleep(1);
-  yarp::os::Network *yNetwork = (yarp::os::Network *) ssGetPWork(S)[0]; 
-  yNetwork->connect(strPortNameWrite.c_str(), strPortNameRead.c_str());
+  Sleep(1000);
+  yarp::os::Network *yNetwork = (yarp::os::Network *) ssGetPWork(S)[0];
+  if(!yNetwork->connect(strPortNameSender.c_str(), strPortNameReceiver.c_str())){
+    std::string strMessage = "error connecting ports \"" + strPortNameSender + "\" to \"" + strPortNameReceiver + "\"";
+    mexWarnMsgTxt(strMessage.c_str());
+  }
   
-  /* m-code:
-     block.Dwork(1).Data = 0;
-  */
-
-      
+     
 }                                            
 
 /* Function: mdlOutputs =======================================================
@@ -201,60 +181,28 @@ static void mdlStart(SimStruct *S) {
  *    block.
  */
 static void mdlOutputs(SimStruct *S, int_T tid) {
-  //    counter *c = (counter *) ssGetPWork(S)[0];   // retrieve C++ object from
-  //    real_T  *y = ssGetOutputPortRealSignal(S,0); // the pointers vector and use
-  //    y[0] = c->output();                          // member functions of the
-  //    UNUSED_ARG(tid);                             // object
-
-
+  
 }                                                
 
 
 #define MDL_UPDATE 
 static void mdlUpdate(SimStruct *S, int_T tid) {
 
+    UNUSED_ARG(tid); /* not used in single tasking mode */
+  
   yarp::os::BufferedPort<yarp::os::Bottle> *yPortOut = (yarp::os::BufferedPort<yarp::os::Bottle> *) ssGetPWork(S)[1]; 
 
   InputRealPtrsType  uPtrs = ssGetInputPortRealSignalPtrs(S,0);
   std::string strMsg = double_array_to_string(uPtrs, 256);
-  mexPrintf("Sending: #%s#\n", strMsg.c_str());
+  //  mexPrintf("Sending: #%s#\n", strMsg.c_str());
   
-  yarp::os::Bottle& bottleMain = yPortOut->prepare(); 
-  bottleMain.clear();
+  yarp::os::Bottle& bottleOut = yPortOut->prepare(); 
+  bottleOut.clear();
   
-  bottleMain.addString(strMsg.c_str());
+  bottleOut.addString(strMsg.c_str());
   yPortOut->write();         
-
-  
+  Sleep(1000/25);
 } 
-
-//--/* For now mdlG[S]etSimState are only supported in normal simulation */
-//--/* Define to indicate that this S-Function has the mdlG[S]etSimState mothods */
-//--#define MDL_SIM_STATE
-//--
-//--
-//--/* Function: mdlGetSimState =====================================================
-//-- * Abstract:
-//-- *
-//-- */
-//--static mxArray* mdlGetSimState(SimStruct* S)
-//--{
-//--  //    counter* c = (counter*) ssGetPWork(S)[0];
-//--  mxArray* outSS = mxCreateDoubleMatrix(1,1,mxREAL);
-//--  //  mxGetPr(outSS)[0] = c->getX();
-//--  return outSS;
-//--}
-//--/* Function: mdlGetSimState =====================================================
-//-- * Abstract:
-//-- *
-//-- */
-//--static void mdlSetSimState(SimStruct* S, const mxArray* ma)
-//--{
-//--  //    counter* c = (counter*) ssGetPWork(S)[0];
-//--  //   c->setX(mxGetPr(ma)[0]);
-//--}
-
-
 
 /* Function: mdlTerminate =====================================================
  * Abstract:
@@ -262,18 +210,17 @@ static void mdlUpdate(SimStruct *S, int_T tid) {
  *    at the termination of a simulation.  For example, if memory was
  *    allocated in mdlStart, this is the place to free it.
  */
-static void mdlTerminate(SimStruct *S)
-{
-  
-  // counter *c = (counter *) ssGetPWork(S)[0]; 
-  // delete c;
+static void mdlTerminate(SimStruct *S) {
 
+  yarp::os::BufferedPort<yarp::os::Bottle> *yPortIn = (yarp::os::BufferedPort<yarp::os::Bottle> *) ssGetPWork(S)[1]; 
+  yPortIn->close();
+
+  
   yarp::os::Network *yNetwork = (yarp::os::Network *) ssGetPWork(S)[0]; 
   yNetwork->fini();
   delete yNetwork;
-    
-    
-}                                              
+}
+
 /*======================================================*
  * See sfuntmpl.doc for the optional S-function methods *
  *======================================================*/

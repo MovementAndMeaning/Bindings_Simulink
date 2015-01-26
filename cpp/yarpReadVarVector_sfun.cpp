@@ -1,4 +1,4 @@
-/*  File    : yarpReadVars_sfun.cpp  */
+/*  File    : yarpReadVarVector_sfun.cpp  */
 
 #include <iostream>
 #include <string>
@@ -14,7 +14,7 @@
 
 
 #define S_FUNCTION_LEVEL 2
-#define S_FUNCTION_NAME  yarpReadVars_sfun
+#define S_FUNCTION_NAME  yarpReadVarVector_sfun
 
 
 /*
@@ -22,6 +22,8 @@
  * its associated macro definitions.
  */
 #include "simstruc.h"
+
+int iNrOutDims;
 
 
 #define IS_PARAM_DOUBLE(pVal) (mxIsNumeric(pVal) && !mxIsLogical(pVal) && !mxIsEmpty(pVal) && !mxIsSparse(pVal) && !mxIsComplex(pVal) && mxIsDouble(pVal))
@@ -34,7 +36,8 @@
 /*
  * Check to make sure that each parameter is 1-d and positive
  */
-static void mdlCheckParameters(SimStruct *S) {
+static void mdlCheckParameters(SimStruct *S)
+{
 
   const mxArray *pVal0 = ssGetSFcnParam(S,0);
 
@@ -52,11 +55,12 @@ static void mdlCheckParameters(SimStruct *S) {
  *    The sizes information is used by Simulink to determine the S-function
  *    block's characteristics (number of inputs, outputs, states, etc.).
  */
-static void mdlInitializeSizes(SimStruct *S) {
+static void mdlInitializeSizes(SimStruct *S)
+{
 
-  ssSetNumSFcnParams(S, 3);  /* Number of expected parameters */
+  ssSetNumSFcnParams(S, 2);  /* Number of expected parameters */
   
-  // Parameter mismatch will be reported by Simulink
+// Parameter mismatch will be reported by Simulink
   if (ssGetNumSFcnParams(S) == ssGetSFcnParamsCount(S)) {
     mdlCheckParameters(S);
     if (ssGetErrorStatus(S) != NULL) {
@@ -77,6 +81,8 @@ static void mdlInitializeSizes(SimStruct *S) {
     
   if (!ssSetNumOutputPorts(S, 1)) return;
   ssSetOutputPortWidth(S, 0, DYNAMICALLY_SIZED);
+
+
 
   
   ssSetNumSampleTimes(S, 1);
@@ -99,7 +105,8 @@ static void mdlInitializeSizes(SimStruct *S) {
  *    S-function. You must register the same number of sample times as
  *    specified in ssSetNumSampleTimes.
  */
-static void mdlInitializeSampleTimes(SimStruct *S) {
+static void mdlInitializeSampleTimes(SimStruct *S)
+{
   ssSetSampleTime(S, 0, mxGetScalar(ssGetSFcnParam(S, 0)));
   ssSetOffsetTime(S, 0, 0.0);
   ssSetModelReferenceSampleTimeDefaultInheritance(S);
@@ -118,6 +125,9 @@ static void mdlStart(SimStruct *S) {
   ssGetPWork(S)[1] = (void *) new yarp::os::BufferedPort<yarp::os::Bottle>();
   yarp::os::BufferedPort<yarp::os::Bottle> *yPortIn = (yarp::os::BufferedPort<yarp::os::Bottle> *) ssGetPWork(S)[1]; 
 
+  iNrOutDims = ssGetOutputPortWidth(S, 0);
+  mexPrintf("ouput width: %d\n", iNrOutDims);
+
 
 #define LENGTH 100
   
@@ -130,6 +140,7 @@ static void mdlStart(SimStruct *S) {
   std::string strPortNameSender(buf01);
   std::string strPortNameReceiver(buf02);
 
+  
   mexPrintf("opening port: %s\n", strPortNameReceiver.c_str());
 
   yPortIn->open(strPortNameReceiver.c_str()); 
@@ -140,7 +151,12 @@ static void mdlStart(SimStruct *S) {
     std::string strMessage = "error connecting ports \"" + strPortNameSender + "\" to \"" + strPortNameReceiver + "\"";
     mexWarnMsgTxt(strMessage.c_str());
   }
-       
+  
+  /* m-code:
+     block.Dwork(1).Data = 0;
+  */
+
+      
 }                                            
 
 /* Function: mdlOutputs =======================================================
@@ -170,21 +186,24 @@ static void mdlUpdate(SimStruct *S, int_T tid) {
     mexPrintf(strNull.c_str());
 #endif
 
-    char_T buf03[LENGTH];
-    mxGetString(ssGetSFcnParam(S, 2), buf03, LENGTH);
-    std::string strVarName(buf03);
-    
-    for (int bb=0;bb<(bottleIn->size()-1);bb++){
+    real_T *y = ssGetOutputPortRealSignal(S, 0);
+    int iBS = bottleIn->size();
+    int iLim = (iBS < iNrOutDims ? iBS : iNrOutDims);
+  
+  
+    for (int bb=0;bb<iLim;bb++){
       yarp::os::Value item = bottleIn->get(bb);
       std::string strKey = item.asList()->get(0).asString();
       double fValue = item.asList()->get(1).asDouble();
-      if(!strKey.compare(strVarName)){
-	  real_T *y = ssGetOutputPortRealSignal(S, 0);
-	  y[0] = fValue;
-	}
+      y[bb] = fValue;
     }
-  }  
+  }
+  
+
+  
+  
 } 
+
 
 /* Function: mdlTerminate =====================================================
  * Abstract:
@@ -194,9 +213,6 @@ static void mdlUpdate(SimStruct *S, int_T tid) {
  */
 static void mdlTerminate(SimStruct *S) {
   
-  // counter *c = (counter *) ssGetPWork(S)[0]; 
-  // delete c;
-
   yarp::os::BufferedPort<yarp::os::Bottle> *yPortIn = (yarp::os::BufferedPort<yarp::os::Bottle> *) ssGetPWork(S)[1]; 
   yPortIn->close();
     
