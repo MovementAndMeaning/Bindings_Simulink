@@ -60,7 +60,7 @@ static void mdlInitializeSizes(SimStruct *S)
 
   ssSetNumSFcnParams(S, 2);  /* Number of expected parameters */
   
-// Parameter mismatch will be reported by Simulink
+  // Parameter mismatch will be reported by Simulink
   if (ssGetNumSFcnParams(S) == ssGetSFcnParamsCount(S)) {
     mdlCheckParameters(S);
     if (ssGetErrorStatus(S) != NULL) {
@@ -105,8 +105,7 @@ static void mdlInitializeSizes(SimStruct *S)
  *    S-function. You must register the same number of sample times as
  *    specified in ssSetNumSampleTimes.
  */
-static void mdlInitializeSampleTimes(SimStruct *S)
-{
+static void mdlInitializeSampleTimes(SimStruct *S) {
   ssSetSampleTime(S, 0, mxGetScalar(ssGetSFcnParam(S, 0)));
   ssSetOffsetTime(S, 0, 0.0);
   ssSetModelReferenceSampleTimeDefaultInheritance(S);
@@ -180,23 +179,34 @@ static void mdlUpdate(SimStruct *S, int_T tid) {
   yarp::os::BufferedPort<yarp::os::Bottle> *yPortIn = (yarp::os::BufferedPort<yarp::os::Bottle> *) ssGetPWork(S)[1];
   yarp::os::Bottle *bottleIn = yPortIn->read(false); // shouldwait = false
   if(bottleIn != NULL) {
+    //#define DEBUG
 #ifdef DEBUG    
     mexPrintf("Receiving: #%s#\n", bottleIn->toString());
     std::string strNull = std::string("is NULL: ") + std::string((bottleIn == NULL ? "yes": "no")) + std::string("\n");
     mexPrintf(strNull.c_str());
 #endif
-
+    
     real_T *y = ssGetOutputPortRealSignal(S, 0);
     int iBS = bottleIn->size();
     int iLim = (iBS < iNrOutDims ? iBS : iNrOutDims);
-  
-  
+    
     for (int bb=0;bb<iLim;bb++){
       yarp::os::Value item = bottleIn->get(bb);
-      std::string strKey = item.asList()->get(0).asString();
-      double fValue = item.asList()->get(1).asDouble();
+      double fValue;
+      if(item.isList()){
+	std::string strKey = item.asList()->get(0).asString();
+	fValue = item.asList()->get(1).asDouble();
+      } else if(item.isDict()){
+	std::string str;
+	std::istringstream iss (item.asDict()->toString()); //-> very annoying; cannot get value for arbitraty key in yarp::os::Property...
+	char c;
+	iss >> str >> fValue >> c;
+      } else {
+	fValue = item.asDouble();
+      }
       y[bb] = fValue;
     }
+    
   }
   
 
