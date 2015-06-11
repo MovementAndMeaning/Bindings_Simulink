@@ -18,3 +18,7 @@ rm yarpReadVarVector_sfun.mexw32.manifest
 call "C:\Program Files (x86)\MATLAB\R2014a\bin\mex.bat" %FLAGS%  %LIBDIRS% %LIBS% %INCL%  yarpReadVarVector_sfun.cpp
 
 
+rm yarpReadSHORE_sfun.mexw32.manifest
+call "C:\Program Files (x86)\MATLAB\R2014a\bin\mex.bat" %FLAGS%  %LIBDIRS% %LIBS% %INCL%  yarpReadSHORE_sfun.cpp
+
+

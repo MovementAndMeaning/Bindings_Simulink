@@ -1,4 +1,4 @@
 Tips
 ----
 
-unload mex file: run "clean mex" in matlab 
+unload mex file: run "clear mex" in matlab 
