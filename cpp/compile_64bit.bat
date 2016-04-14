@@ -1,7 +1,7 @@
 @echo OFF
-set YARP_DIR=C:\src\yarp-git_VS15\
-set MATLAB_DIR=C:\Program Files (x86)\MATLAB\R2015b\
-set ACE_DIR=C:/src/ACE_wrappers/
+set YARP_DIR=C:\src\yarp-git_VS15_64bit
+set MATLAB_DIR=C:\Program Files\MATLAB\R2016a
+set ACE_DIR=C:/src/ACE-6.3.3_64bit
 set WIN_SDK_DIR=C:\Program Files\Microsoft SDKs\Windows\v7.1A\
 
 REM set LIBDIRS=-L"C:/src/yarp-2.3.22_VS10/lib/Release/" -LC:/src/ACE_wrappers/lib -L"C:\Program Files\Microsoft SDKs\Windows\v7.1\Lib"
@@ -23,23 +23,22 @@ echo %LIBDIRS%
 echo %LIBS%
 echo %INCL%
 
-del  yarpSendText_sfun.mexw32.manifest
+del  yarpSendText_sfun.mexw64.manifest
 call "%MATLAB_DIR%\bin\mex.bat" %FLAGS%  %LIBDIRS% %LIBS% %INCL%  yarpSendText_sfun.cpp
 
-del  yarpSendDicts_sfun.mexw32.manifest
+del  yarpSendDicts_sfun.mexw64.manifest
 call "%MATLAB_DIR%\bin\mex.bat" %FLAGS%  %LIBDIRS% %LIBS% %INCL%  yarpSendDicts_sfun.cpp
 
-del  yarpReadDicts_sfun.mexw32.manifest
+del  yarpReadDicts_sfun.mexw64.manifest
 call "%MATLAB_DIR%\bin\mex.bat" %FLAGS%  %LIBDIRS% %LIBS% %INCL%  yarpReadDicts_sfun.cpp
 
-del yarpReadVars_sfun.mexw32.manifest
+del yarpReadVars_sfun.mexw64.manifest
 call "%MATLAB_DIR%\bin\mex.bat" %FLAGS%  %LIBDIRS% %LIBS% %INCL%  yarpReadVars_sfun.cpp
 
-del yarpReadVarVector_sfun.mexw32.manifest
+del yarpReadVarVector_sfun.mexw64.manifest
 call "%MATLAB_DIR%\bin\mex.bat" %FLAGS%  %LIBDIRS% %LIBS% %INCL%  yarpReadVarVector_sfun.cpp
 
-
-del yarpReadSHORE_sfun.mexw32.manifest
+del yarpReadSHORE_sfun.mexw64.manifest
 call "%MATLAB_DIR%\bin\mex.bat" %FLAGS%  %LIBDIRS% %LIBS% %INCL%  yarpReadSHORE_sfun.cpp
 
 

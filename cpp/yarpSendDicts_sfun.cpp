@@ -1,4 +1,4 @@
-/*  File    : yarpSendText_sfun.cpp
+/*  File    : yarpSendDicts_sfun.cpp
  *  Abstract:
  *
  *      Example of an C++ S-function which stores an C++ object in
@@ -7,14 +7,13 @@
  *  Copyright 1990-2013 The MathWorks, Inc.
  */
 
-
-
-
+//#define DEBUG
 
 #include <iostream>
 #include <string>
 #include <algorithm>
 #include <sstream>
+#include <list>
 #ifdef MEX 
 #include "mex.h"
 #endif     
@@ -27,7 +26,7 @@
 
 
 #define S_FUNCTION_LEVEL 2
-#define S_FUNCTION_NAME  yarpSendText_sfun
+#define S_FUNCTION_NAME  yarpSendDicts_sfun
 
 /*
  * Need to include simstruc.h for the definition of the SimStruct and
@@ -35,6 +34,7 @@
  */
 #include "simstruc.h"
 
+std::list<std::string> lstMsgFormat;
 
 std::string int_array_to_string(int int_array[], int size_of_array) {
   std::ostringstream oss("");
@@ -68,7 +68,9 @@ static void mdlCheckParameters(SimStruct *S) {
   const mxArray *pVal0 = ssGetSFcnParam(S,0);
 
 #ifdef MEX 
+  //  if ( !IS_PARAM_DOUBLE(pVal0)) {
   if ( !IS_PARAM_CARRAY(pVal0)) {
+    //    ssSetErrorStatus(S, "Parameter to S-function must be a double scalar");
     ssSetErrorStatus(S, "Parameter to S-function must be a text");
     return;
   }
@@ -84,7 +86,7 @@ static void mdlCheckParameters(SimStruct *S) {
  */
 static void mdlInitializeSizes(SimStruct *S) {
 
-  ssSetNumSFcnParams(S, 2);  /* Number of expected parameters */
+  ssSetNumSFcnParams(S, 3);  /* Number of expected parameters */
   
   // Parameter mismatch will be reported by Simulink
   if (ssGetNumSFcnParams(S) == ssGetSFcnParamsCount(S)) {
@@ -155,29 +157,39 @@ static void mdlStart(SimStruct *S) {
 
 #define LENGTH 100
   
+  
   char_T buf01[LENGTH];
   mxGetString(ssGetSFcnParam(S, 0), buf01, LENGTH);
 
   char_T buf02[LENGTH];
   mxGetString(ssGetSFcnParam(S, 1), buf02, LENGTH);
 
- 
+
   std::string strPortNameSender(buf01);
   std::string strPortNameReceiver(buf02);
 
+  char_T buf03[LENGTH];
+  mxGetString(ssGetSFcnParam(S, 2), buf03, LENGTH);
+  char * pch;
+  const char s[2] = ";";  
+  pch = strtok (buf03,s);
+  while (pch != NULL){
+    lstMsgFormat.push_back(pch);
+    pch = strtok (NULL, s);
+  }
+
   yarp::os::Network *yNetwork = (yarp::os::Network *) ssGetPWork(S)[0];
   if(yNetwork->exists(strPortNameSender.c_str())){
-    mexErrMsgIdAndTxt("yarpSendText:mdlStart", "Port already exists");
+    mexErrMsgIdAndTxt("yarpSendDicts:mdlStart", "Port already exists");
   } 
 
-  
+    
 #ifdef MEX 
   mexPrintf("writing to port: %s\n", strPortNameSender.c_str());
 #endif
   yPortOut->open(strPortNameSender.c_str()); 
 
   Sleep(500);
-
   if(!yNetwork->connect(strPortNameSender.c_str(), strPortNameReceiver.c_str(), "udp")){
     std::string strMessage = "error connecting ports \"" + strPortNameSender + "\" to \"" + strPortNameReceiver + "\"";
 #ifdef MEX 
@@ -201,23 +213,45 @@ static void mdlOutputs(SimStruct *S, int_T tid) {
 #define MDL_UPDATE 
 static void mdlUpdate(SimStruct *S, int_T tid) {
 
-  UNUSED_ARG(tid); /* not used in single tasking mode */
-  
-  yarp::os::BufferedPort<yarp::os::Bottle> *yPortOut = (yarp::os::BufferedPort<yarp::os::Bottle> *) ssGetPWork(S)[1]; 
+    UNUSED_ARG(tid); /* not used in single tasking mode */
 
-  InputRealPtrsType  uPtrs = ssGetInputPortRealSignalPtrs(S,0);
-  std::string strMsg = double_array_to_string(uPtrs, 2048);
-  //  mexPrintf("Sending: #%s#\n", strMsg.c_str());
-  
+    
+
+    
+  yarp::os::BufferedPort<yarp::os::Bottle> *yPortOut = (yarp::os::BufferedPort<yarp::os::Bottle> *) ssGetPWork(S)[1]; 
   yarp::os::Bottle& bottleOut = yPortOut->prepare(); 
   bottleOut.clear();
+  yarp::os::Property &prop = bottleOut.addDict();
+
+  InputRealPtrsType  uPtrs = ssGetInputPortRealSignalPtrs(S,0);
+  //  std::string strMsg = double_array_to_string(uPtrs, 2048);
+  //  mexPrintf("Sending: #%s#\n", strMsg.c_str());
+
   
-  bottleOut.addString(strMsg.c_str());
-  yPortOut->write();         
-  /* I don't think we should sleep in the s-function:
-     users should take care of this at the model level 
-     Sleep(1000/25); */
-  
+  std::string token = "";
+  std::list<std::string>::iterator it = lstMsgFormat.begin();
+ 
+  int_T nu = ssGetInputPortWidth(S,0);
+  for (int_T j = 0; j < nu; j++) {
+    if(j<lstMsgFormat.size()){
+      //      token = lstMsgFormat[j];
+      token = it->c_str();
+      it++;
+    } else {
+      token = "#";
+    }
+    
+#ifdef DEBUG    
+    mexPrintf("Sending: %s %f\n", token, *uPtrs[j]);
+#endif
+    prop.put(token, *uPtrs[j]);
+  }
+
+
+#ifdef DEBUG      
+  mexPrintf("--------------------\n");  
+#endif 
+  yPortOut->write();           
 } 
 
 /* Function: mdlTerminate =====================================================

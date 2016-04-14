@@ -78,7 +78,6 @@ static void mdlInitializeSizes(SimStruct *S) {
   if (!ssSetNumOutputPorts(S, 1)) return;
   ssSetOutputPortWidth(S, 0, DYNAMICALLY_SIZED);
 
-  
   ssSetNumSampleTimes(S, 1);
 
   ssSetNumPWork(S, 2); // reserve element in the pointers vector
@@ -100,7 +99,8 @@ static void mdlInitializeSizes(SimStruct *S) {
  *    specified in ssSetNumSampleTimes.
  */
 static void mdlInitializeSampleTimes(SimStruct *S) {
-  ssSetSampleTime(S, 0, mxGetScalar(ssGetSFcnParam(S, 0)));
+  ssSetSampleTime(S, 0, INHERITED_SAMPLE_TIME);
+  
   ssSetOffsetTime(S, 0, 0.0);
   ssSetModelReferenceSampleTimeDefaultInheritance(S);
 }
@@ -130,13 +130,17 @@ static void mdlStart(SimStruct *S) {
   std::string strPortNameSender(buf01);
   std::string strPortNameReceiver(buf02);
 
+  yarp::os::Network *yNetwork = (yarp::os::Network *) ssGetPWork(S)[0];
+  if(yNetwork->exists(strPortNameReceiver.c_str())){
+    mexErrMsgIdAndTxt("yarpReadVars:mdlStart", "Port already exists");
+  } 
+    
   mexPrintf("opening port: %s\n", strPortNameReceiver.c_str());
 
   yPortIn->open(strPortNameReceiver.c_str()); 
 
-  Sleep(1000);
-  yarp::os::Network *yNetwork = (yarp::os::Network *) ssGetPWork(S)[0];
-  if(!yNetwork->connect(strPortNameSender.c_str(), strPortNameReceiver.c_str())){
+  Sleep(500);
+  if(!yNetwork->connect(strPortNameSender.c_str(), strPortNameReceiver.c_str(), "udp")){
     std::string strMessage = "error connecting ports \"" + strPortNameSender + "\" to \"" + strPortNameReceiver + "\"";
     mexWarnMsgTxt(strMessage.c_str());
   }
