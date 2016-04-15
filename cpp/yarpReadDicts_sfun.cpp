@@ -1,22 +1,11 @@
-/*  File    : yarpSendDicts_sfun.cpp
- *  Abstract:
- *
- *      Example of an C++ S-function which stores an C++ object in
- *      the pointers vector PWork.
- *
- *  Copyright 1990-2013 The MathWorks, Inc.
- */
-
-//#define DEBUG
+/*  File    : yarpReadDicts_sfun.cpp  */
 
 #include <iostream>
 #include <string>
 #include <algorithm>
 #include <sstream>
 #include <list>
-#ifdef MEX 
 #include "mex.h"
-#endif     
 #include <Windows.h>
 
 #include <yarp/os/Network.h>
@@ -26,7 +15,8 @@
 
 
 #define S_FUNCTION_LEVEL 2
-#define S_FUNCTION_NAME  yarpSendDicts_sfun
+#define S_FUNCTION_NAME  yarpReadDicts_sfun
+
 
 /*
  * Need to include simstruc.h for the definition of the SimStruct and
@@ -34,26 +24,10 @@
  */
 #include "simstruc.h"
 
+int iNrOutDims;
 std::list<std::string> lstMsgFormat;
-yarp::os::BufferedPort<yarp::os::Bottle> *yPortOut;
-yarp::os::Network *yNetwork;
 
-std::string int_array_to_string(int int_array[], int size_of_array) {
-  std::ostringstream oss("");
-  for (int temp = 0; temp < size_of_array; temp++){
-    oss << (char)int_array[temp];
-  }
-  return oss.str();
-}
-
-std::string double_array_to_string(InputRealPtrsType double_array, int size_of_array) {
-  std::ostringstream oss("");
-  for (int temp = 0; temp < size_of_array; temp++){
-    oss << (char)*double_array[temp];
-  }
-  return oss.str();
-}
-
+//#define DEBUG
 
 #define IS_PARAM_DOUBLE(pVal) (mxIsNumeric(pVal) && !mxIsLogical(pVal) && !mxIsEmpty(pVal) && !mxIsSparse(pVal) && !mxIsComplex(pVal) && mxIsDouble(pVal))
 #define IS_PARAM_CARRAY(pVal) (mxIsChar(pVal) && !mxIsLogical(pVal) && !mxIsEmpty(pVal) && !mxIsSparse(pVal) && !mxIsComplex(pVal) && !mxIsDouble(pVal))
@@ -65,19 +39,17 @@ std::string double_array_to_string(InputRealPtrsType double_array, int size_of_a
 /*
  * Check to make sure that each parameter is 1-d and positive
  */
-static void mdlCheckParameters(SimStruct *S) {
+static void mdlCheckParameters(SimStruct *S)
+{
 
   const mxArray *pVal0 = ssGetSFcnParam(S,0);
 
-#ifdef MEX 
   //  if ( !IS_PARAM_DOUBLE(pVal0)) {
   if ( !IS_PARAM_CARRAY(pVal0)) {
     //    ssSetErrorStatus(S, "Parameter to S-function must be a double scalar");
     ssSetErrorStatus(S, "Parameter to S-function must be a text");
     return;
-  }
-#endif     
-
+  } 
 }
 
 
@@ -86,7 +58,8 @@ static void mdlCheckParameters(SimStruct *S) {
  *    The sizes information is used by Simulink to determine the S-function
  *    block's characteristics (number of inputs, outputs, states, etc.).
  */
-static void mdlInitializeSizes(SimStruct *S) {
+static void mdlInitializeSizes(SimStruct *S)
+{
 
   ssSetNumSFcnParams(S, 3);  /* Number of expected parameters */
   
@@ -105,17 +78,17 @@ static void mdlInitializeSizes(SimStruct *S) {
   ssSetNumContStates(S, 0);
   ssSetNumDiscStates(S, 0);
 
-  if (!ssSetNumInputPorts(S, 1)) return;
-  ssSetInputPortWidth(S, 0, DYNAMICALLY_SIZED);
-  ssSetInputPortDirectFeedThrough(S, 0, 1);
+  if (!ssSetNumInputPorts(S, 0)) return;
+  //  ssSetInputPortDirectFeedThrough(S, 0, 1);
   
     
-  if (!ssSetNumOutputPorts(S, 0)) return;
-  //not needed?    ssSetOutputPortWidth(S, 0, 1);
+  if (!ssSetNumOutputPorts(S, 1)) return;
+  ssSetOutputPortWidth(S, 0, DYNAMICALLY_SIZED);
 
+
+
+  
   ssSetNumSampleTimes(S, 1);
-  //--  ssSetNumRWork(S, 0);
-  //--  ssSetNumIWork(S, 0);
 
   ssSetNumPWork(S, 2); // reserve element in the pointers vector
 
@@ -142,8 +115,6 @@ static void mdlInitializeSampleTimes(SimStruct *S) {
   //is this needed:  ssSetModelReferenceSampleTimeDefaultInheritance(S);
 }
 
-
-
 /* Function: mdlStart =======================================================
  * Abstract:
  *    This function is called once at start of model execution. If you
@@ -155,19 +126,19 @@ static void mdlStart(SimStruct *S) {
   //      ssGetPWork(S)[0] = (void *) new counter; // store new C++ object in the pointers vector
   ssGetPWork(S)[0] = (void *) new yarp::os::Network();
   ssGetPWork(S)[1] = (void *) new yarp::os::BufferedPort<yarp::os::Bottle>();
-  //TEMP  yarp::os::BufferedPort<yarp::os::Bottle> *yPortOut = (yarp::os::BufferedPort<yarp::os::Bottle> *) ssGetPWork(S)[1]; 
-  yPortOut = new yarp::os::BufferedPort<yarp::os::Bottle>();
-  
+  yarp::os::BufferedPort<yarp::os::Bottle> *yPortIn = (yarp::os::BufferedPort<yarp::os::Bottle> *) ssGetPWork(S)[1]; 
+
+  iNrOutDims = ssGetOutputPortWidth(S, 0);
+  mexPrintf("ouput width: %d\n", iNrOutDims);
+
 
 #define LENGTH 100
-  
   
   char_T buf01[LENGTH];
   mxGetString(ssGetSFcnParam(S, 0), buf01, LENGTH);
 
   char_T buf02[LENGTH];
   mxGetString(ssGetSFcnParam(S, 1), buf02, LENGTH);
-
 
   std::string strPortNameSender(buf01);
   std::string strPortNameReceiver(buf02);
@@ -182,29 +153,39 @@ static void mdlStart(SimStruct *S) {
     pch = strtok (NULL, s);
   }
 
-  //TEMP  yarp::os::Network *yNetwork = (yarp::os::Network *) ssGetPWork(S)[0];
-  yNetwork = new yarp::os::Network();
-  if(yNetwork->exists(strPortNameSender.c_str())){
-    mexErrMsgIdAndTxt("yarpSendDicts:mdlStart", "Port already exists");
+
+  //--------------------
+  
+  yarp::os::Network *yNetwork = (yarp::os::Network *) ssGetPWork(S)[0];
+  if(yNetwork->exists(strPortNameReceiver.c_str())){
+    mexErrMsgIdAndTxt("yarpReadDicts:mdlStart", "Port already exists");
+  } 
+  
+  
+#ifdef MEX 
+  mexPrintf("opening_ port: %s\n", strPortNameReceiver.c_str());
+#endif
+
+  if(!yPortIn->open(strPortNameReceiver.c_str())){
+     mexErrMsgIdAndTxt("yarpReadDicts:mdlStart", "Error opening port");
   } 
 
-    
-#ifdef MEX 
-  mexPrintf("writing to port: %s\n", strPortNameSender.c_str());
-#endif
-  yPortOut->open(strPortNameSender.c_str()); 
-
-
+  //--------------------
   
   Sleep(500);
+
   if(!yNetwork->connect(strPortNameSender.c_str(), strPortNameReceiver.c_str(), "udp")){
-    std::string strMessage = "error connecting ports \"" + strPortNameSender + "\" to \"" + strPortNameReceiver + "\"";
 #ifdef MEX 
+    std::string strMessage = "error connecting ports \"" + strPortNameSender + "\" to \"" + strPortNameReceiver + "\"";
     mexWarnMsgTxt(strMessage.c_str());
-#endif
+#endif    
   }
   
-     
+  /* m-code:
+     block.Dwork(1).Data = 0;
+  */
+
+      
 }                                            
 
 /* Function: mdlOutputs =======================================================
@@ -213,53 +194,66 @@ static void mdlStart(SimStruct *S) {
  *    block.
  */
 static void mdlOutputs(SimStruct *S, int_T tid) {
-  
+  //    counter *c = (counter *) ssGetPWork(S)[0];   // retrieve C++ object from
+  //    real_T  *y = ssGetOutputPortRealSignal(S,0); // the pointers vector and use
+  //    y[0] = c->output();                          // member functions of the
+  //    UNUSED_ARG(tid);                             // object
+
+
 }                                                
 
 
 #define MDL_UPDATE 
 static void mdlUpdate(SimStruct *S, int_T tid) {
-
-    UNUSED_ARG(tid); /* not used in single tasking mode */
-
+  
+  yarp::os::BufferedPort<yarp::os::Bottle> *yPortIn = (yarp::os::BufferedPort<yarp::os::Bottle> *) ssGetPWork(S)[1];
+  yarp::os::Bottle *bottleIn = yPortIn->read(false); // shouldwait = false
+  if(bottleIn != NULL) {
+    //#define DEBUG
+#ifdef DEBUG    
+//    mexPrintf("Receiving: #%s#\n", bottleIn->toString());
+//    std::string strNull = std::string("is NULL: ") + std::string((bottleIn == NULL ? "yes": "no")) + std::string("\n");
+//    mexPrintf(strNull.c_str());
+#endif
     
+    real_T *y = ssGetOutputPortRealSignal(S, 0);
 
+#ifdef DEBUG	    
+    mexPrintf("bottle size: %d\n", bottleIn->size());
+#endif
     
-    //TEMP  yarp::os::BufferedPort<yarp::os::Bottle> *yPortOut = (yarp::os::BufferedPort<yarp::os::Bottle> *) ssGetPWork(S)[1]; 
-  yarp::os::Bottle& bottleOut = yPortOut->prepare(); 
-  bottleOut.clear();
-  yarp::os::Property &prop = bottleOut.addDict();
-
-  InputRealPtrsType  uPtrs = ssGetInputPortRealSignalPtrs(S,0);
-  //  std::string strMsg = double_array_to_string(uPtrs, 2048);
-  //  mexPrintf("Sending: #%s#\n", strMsg.c_str());
+    if(bottleIn->size()==1){
+      yarp::os::Value item = bottleIn->get(0);
+      if(item.isDict()){
+#ifdef DEBUG	    
+	mexPrintf("DICT\n");
+#endif	
+	int ii=0;
+	for (auto&& token : lstMsgFormat) {
+	  yarp::os::Value &val =  item.find(token);
+	  if(!val.isNull()){
+#ifdef DEBUG	    
+	    mexPrintf("%s: %f\n", token, val.asDouble());
+#endif
+	    if(ii<iNrOutDims){
+	      y[ii] = val.asDouble();
+	    }
+	  } else {
+#ifdef DEBUG	    
+	    mexPrintf("not found\n");
+#endif
+	  }
+	  ii++;
+	}
+      }
+    }
+  }
+  
 
   
-  std::string token = "";
-  std::list<std::string>::iterator it = lstMsgFormat.begin();
- 
-  int_T nu = ssGetInputPortWidth(S,0);
-  for (int_T j = 0; j < nu; j++) {
-    if(j<lstMsgFormat.size()){
-      //      token = lstMsgFormat[j];
-      token = it->c_str();
-      it++;
-    } else {
-      token = "#";
-    }
-    
-#ifdef DEBUG    
-    mexPrintf("Sending: %s %f\n", token, *uPtrs[j]);
-#endif
-    prop.put(token, *uPtrs[j]);
-  }
-
-
-#ifdef DEBUG      
-  mexPrintf("--------------------\n");  
-#endif 
-  yPortOut->write();           
+  
 } 
+
 
 /* Function: mdlTerminate =====================================================
  * Abstract:
@@ -268,16 +262,19 @@ static void mdlUpdate(SimStruct *S, int_T tid) {
  *    allocated in mdlStart, this is the place to free it.
  */
 static void mdlTerminate(SimStruct *S) {
-
-  //TEMP  yarp::os::BufferedPort<yarp::os::Bottle> *yPortOut = (yarp::os::BufferedPort<yarp::os::Bottle> *) ssGetPWork(S)[1]; 
-  yPortOut->close();
-
-  
-  //TEMP  yarp::os::Network *yNetwork = (yarp::os::Network *) ssGetPWork(S)[0]; 
+  yarp::os::BufferedPort<yarp::os::Bottle> *yPortIn = (yarp::os::BufferedPort<yarp::os::Bottle> *) ssGetPWork(S)[1]; 
+  yPortIn->interrupt();
+  yPortIn->close();
+    
+  yarp::os::Network *yNetwork = (yarp::os::Network *) ssGetPWork(S)[0]; 
   yNetwork->fini();
   delete yNetwork;
-}
+  delete yPortIn;
 
+
+
+  
+}                                              
 /*======================================================*
  * See sfuntmpl.doc for the optional S-function methods *
  *======================================================*/
