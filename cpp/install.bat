@@ -1,6 +1,6 @@
 @echo OFF
 
-set INSTALL_DIR=%USERPROFILE%\Documents\MATLAB
+set INSTALL_DIR=%USERPROFILE%\Documents\MATLAB\m+m_Bindings
 
 echo copying files to %INSTALL_DIR%
 pause

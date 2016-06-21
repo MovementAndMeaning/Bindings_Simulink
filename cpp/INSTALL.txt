@@ -1,0 +1,13 @@
+Installation
+------------
+
+Install the library in `%USERPROFILE%\Documents\MATLAB\m+m_Bindings`
+
+For the library to load you have to add 
+    addpath '<%USERPROFILE%>\Documents\MATLAB\m+m_Bindings" %use the full path e.g. c:\users\ulysses\documents\matlab\m+m_Bindings
+to the file
+    startup.m
+in `%USERPROFILE%\Documents\MATLAB`
+
+
+
